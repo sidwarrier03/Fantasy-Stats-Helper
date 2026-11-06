@@ -1,6 +1,28 @@
 import * as L from "../lib.js";
 
 const EXAMPLES = [
+  ["QB EPA per dropback (RBSDM style)", `SELECT p.full_name, p.team, SUM(a.dropbacks) AS dropbacks,
+       ROUND(SUM(a.pass_epa) / SUM(a.dropbacks), 3) AS epa_per_db,
+       ROUND(1.0 * SUM(a.pass_success) / SUM(a.dropbacks), 3) AS success_rate,
+       ROUND(SUM(a.cpoe_sum) / SUM(a.cpoe_n), 1) AS cpoe,
+       ROUND(1.0 * SUM(a.pressured) / SUM(a.dropbacks), 3) AS pressure_rate
+FROM adv_week a JOIN players p USING (player_id)
+WHERE a.season = (SELECT MAX(season) FROM adv_week)
+GROUP BY a.player_id HAVING SUM(a.dropbacks) >= 100 ORDER BY epa_per_db DESC`],
+  ["End-zone and red-zone targets", `SELECT p.full_name, p.pos, p.team, SUM(a.ez_targets) AS end_zone_tgt, SUM(a.rz_targets) AS rz_tgt,
+       SUM(a.targets) AS targets, ROUND(SUM(a.rec_epa) / SUM(a.targets), 3) AS epa_per_tgt
+FROM adv_week a JOIN players p USING (player_id)
+WHERE a.season = (SELECT MAX(season) FROM adv_week) AND p.pos IN ('WR','TE','RB')
+GROUP BY a.player_id ORDER BY end_zone_tgt DESC, rz_tgt DESC LIMIT 30`],
+  ["Team offense EPA/play by week", `SELECT team, week, plays, ROUND(epa / plays, 3) AS epa_per_play,
+       ROUND(1.0 * success / plays, 3) AS success_rate, ROUND(pass_oe_sum / xpass_n, 1) AS proe
+FROM team_adv_week WHERE side = 'off' AND season = (SELECT MAX(season) FROM team_adv_week)
+ORDER BY week DESC, epa_per_play DESC`],
+  ["Next Gen Stats: separation leaders", `SELECT p.full_name, p.team, json_extract(n.data, '$.sep') AS separation,
+       json_extract(n.data, '$.yacoe') AS yac_over_expected, json_extract(n.data, '$.cushion') AS cushion
+FROM ngs_season n JOIN players p USING (player_id)
+WHERE n.kind = 'receiving' AND n.season = (SELECT MAX(season) FROM ngs_season)
+ORDER BY separation DESC LIMIT 25`],
   ["Target share leaders, last 4 weeks", `WITH recent AS (SELECT MAX(week) - 3 AS w FROM stats WHERE season = (SELECT MAX(season) FROM stats))
 SELECT p.full_name, s.team, SUM(s.rec_tgt) AS targets, ROUND(1.0 * SUM(s.rec_tgt) / SUM(t.tm_tgt), 3) AS tgt_share,
        ROUND(AVG(s.pts_ppr), 1) AS ppr_ppg

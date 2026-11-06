@@ -64,6 +64,8 @@ export async function render(root, [id]) {
       </section>
     </div>
 
+    ${advancedCard(p, cur)}
+
     <div class="grid g2">
       <section class="card">
         <div class="card-head"><h2>Usage by week</h2><span class="sub">${season}</span></div>
@@ -165,3 +167,49 @@ export async function render(root, [id]) {
 }
 
 const tile = (l, v, sub) => `<div class="stat-tile"><span class="l">${l}</span><span class="v">${v}</span><span class="small muted">${sub}</span></div>`;
+
+// Advanced metrics for the latest season (play-by-play, Pro-Football-Reference and Next Gen Stats via nflverse).
+function advancedCard(p, cur) {
+  const a = cur?.adv || {};
+  if (!a.adv_plays || !["QB", "RB", "WR", "TE"].includes(p.pos)) return "";
+  const sg = (v, d = 2) => (v == null ? "–" : `${v > 0 ? "+" : ""}${Number(v).toFixed(d)}`);
+  const wopr = cur.tgt_share != null && cur.air_share != null ? 1.5 * cur.tgt_share + 0.7 * cur.air_share : null;
+  let tiles;
+  if (p.pos === "QB") {
+    tiles = [
+      ["EPA / dropback", sg(a.epa_db), `${L.int(a.dropbacks)} dropbacks`],
+      ["Success rate", L.pct(a.sr_db, 1), "dropbacks with positive EPA"],
+      ["CPOE", sg(a.cpoe, 1), "completion % over expected"],
+      ["aDOT", L.n(a.adot_pass), `${L.pct(a.deep_pct)} of throws 20+ yards`],
+      ["Time to throw", a.ttt != null ? `${L.n(a.ttt, 2)}s` : "–", "Next Gen Stats"],
+      ["Pressure rate", L.pct(a.press_pct, 1), `${L.pct(a.sack_pct, 1)} sack rate`],
+      ["Bad throw rate", L.pct(a.bad_pct, 1), "Pro-Football-Reference charting"],
+      ["Rushing EPA", sg(a.rush_epa, 1), `${L.int(a.runs)} designed runs, ${L.int(a.scrambles)} scrambles`],
+    ];
+  } else if (p.pos === "RB") {
+    tiles = [
+      ["EPA / rush", sg(a.epa_rush), `${L.int(a.runs)} designed runs`],
+      ["Rush success", L.pct(a.sr_rush, 1), "runs with positive EPA"],
+      ["RYOE / att", sg(a.ryoe_att), "rush yards over expected (NGS)"],
+      ["Yards after contact", L.n(a.yco_att, 2), "per carry (PFR)"],
+      ["Broken tackles", L.int(a.btk), "rushing + receiving (PFR)"],
+      ["10+ yard runs", L.pct(a.expl_pct, 1), `${a.box8 != null ? `${L.n(a.box8, 0)}% vs 8+ in the box` : "of designed runs"}`],
+      ["Receiving EPA", sg(a.rec_epa, 1), `${sg(a.epa_tgt)} per target`],
+      ["Inside-5 carries", L.int(a.i5_rush), `${L.int(a.rz_rush)} red-zone carries`],
+    ];
+  } else {
+    tiles = [
+      ["EPA / target", sg(a.epa_tgt), `${L.pct(a.sr_tgt, 1)} success rate`],
+      ["WOPR", wopr != null ? L.n(wopr, 2) : "–", "target + air-yard share (0.7+ is elite)"],
+      ["Separation", a.sep != null ? `${L.n(a.sep, 2)} yds` : "–", "Next Gen Stats"],
+      ["YAC over expected", sg(a.yacoe, 1), `${L.n(a.yac_rec)} YAC per catch`],
+      ["RACR", L.n(a.racr, 2), "receiving yards per air yard"],
+      ["Drop rate", L.pct(a.drop_pct, 1), `${L.int(a.drops)} drops (PFR)`],
+      ["Rating when targeted", L.n(a.rtg_tgt, 1), "passer rating on his targets"],
+      ["End-zone targets", L.int(a.ez_tgt), `${L.int(a.rz_tgt)} red-zone targets`],
+    ];
+  }
+  return `<section class="card"><div class="card-head"><h2>Advanced · ${cur.season}</h2>
+    <span class="sub">Play-by-play, Pro-Football-Reference and Next Gen Stats via nflverse · <a href="#stats" style="color:var(--accent)">compare in the Stats Database</a></span></div>
+    <div class="grid g4" style="gap:10px">${tiles.map(([l, v, s]) => tile(l, v, s)).join("")}</div></section>`;
+}

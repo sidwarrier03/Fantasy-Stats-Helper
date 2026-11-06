@@ -69,6 +69,8 @@ def connect(path=DEFAULT_DB, readonly=False):
         conn = sqlite3.connect(path, timeout=30, check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(SCHEMA)
+        from . import advanced  # imported here to avoid a circular import
+        advanced.ensure_schema(conn)
     conn.row_factory = sqlite3.Row
     return conn
 

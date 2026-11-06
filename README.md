@@ -38,6 +38,9 @@ The first start builds the database (about 30 seconds). After that it opens inst
 | Dynasty and redraft trade values (1QB and Superflex) | FantasyCalc | Every 6 hours, with a daily snapshot saved for value history |
 | Trending adds and drops | Sleeper | Hourly |
 | NFL schedule | Sleeper | Every 12 hours |
+| Advanced play-by-play metrics: EPA, success rate, CPOE, air yards, red-zone and end-zone looks, team efficiency | nflverse play-by-play (the nflfastR data RBSDM and NFL Savant are built on) | Every 12 hours for the current season; past seasons once |
+| Pressures, blitzes, bad throws, drops, broken tackles, yards before/after contact | Pro-Football-Reference, via nflverse's weekly mirror | Every 12 hours |
+| Separation, YAC over expected, rush yards over expected, time to throw, aggressiveness | NFL Next Gen Stats, via nflverse | Every 12 hours |
 
 The **Update now** button in the sidebar runs a check right away.
 
@@ -50,7 +53,16 @@ To keep the database fresh even when the app is closed, schedule the headless up
 ## The tools
 
 - **Dashboard**: the week at a glance. Top scorers from the last finished week, this week's games, the most added and dropped players, 30-day value risers and fallers, and an injury report.
-- **Stats Database**: every player's season in one sortable table, with views for fantasy, usage (snap %, target share, air-yard share, rush share, aDOT, red-zone looks), passing, rushing and receiving. Weekly sparklines, Top-12/Top-24 hit rates, consistency, and CSV export.
+- **Stats Database**: every player's season in one sortable, searchable table, with views for:
+  - **Fantasy** and **Usage** (snap %, target share, air-yard share, WOPR)
+  - **Passing**: EPA per dropback, success rate, CPOE, aDOT, deep %, time to throw, aggressiveness, pressure %, sack %, bad-throw %
+  - **Rushing**: EPA per run, success rate, rush yards over expected, yards after contact, broken tackles, 10+ yard runs, 8-man boxes
+  - **Receiving**: EPA per target, success rate, WOPR, RACR, YAC over expected, separation, drop %, passer rating when targeted
+  - **Red zone**: red-zone and end-zone targets, red-zone and inside-5 carries
+  - **Efficiency**: total EPA across passing, rushing and receiving
+
+  Filter by position, team and a minimum volume (dropbacks, carries, targets), then stack your own filters on any stat (for example "EPA/target at least 0.3" and "Drop % at most 5"). Hover a column name for what it measures and where it comes from. CSV export includes every column.
+- **Team Tiers**: offense vs defense EPA per play on one chart (the RBSDM / SumerSports-style tier chart), plus pass and rush EPA, success rates and pass rate over expected for every team, for the full season or the last 4 or 8 weeks.
 - **Player pages**: weekly points chart colored by positional finish, snap-share and target-share trends, game logs, career table, all four trade values with history, and the upcoming schedule with matchup difficulty and projections.
 - **Rankings**: dynasty or redraft, 1QB or Superflex, with tiers, 30-day trends, rookies-only and draft-pick filters, and a Buy/Sell signal that compares market price with actual production.
 - **Compare Players**: up to four players side by side, with an overlaid weekly points chart.
@@ -87,4 +99,10 @@ python3 huddle.py update --full      re-download everything once and exit
 - `core/`: the Python backend (`updater.py` syncs data, `queries.py` powers each page, `server.py` serves the app).
 - `web/`: the browser app (plain HTML, CSS and JavaScript, no build step).
 
-Data comes from Sleeper's and FantasyCalc's free public APIs. Huddle only reads public data and never posts anything to your leagues.
+## Data sources
+
+- **Sleeper**: players, injuries, weekly box scores, fantasy points, projections, trending players, and your leagues.
+- **FantasyCalc**: dynasty and redraft trade values.
+- **nflverse** (open NFL data, CC BY 4.0): play-by-play with the nflfastR expected-points model, Pro-Football-Reference advanced stats and NFL Next Gen Stats. RBSDM.com and NFL Savant are built on this same play-by-play, so EPA and success rates line up with those sites. Pro-Football-Reference blocks automated downloads, so Huddle uses nflverse's weekly copy of PFR's advanced stats instead of PFR directly. SumerSports' terms don't allow automated access, so Huddle computes its own team tiers from the same play-by-play instead.
+
+Huddle only reads public data and never posts anything to your leagues.

@@ -8,7 +8,7 @@ import json
 import statistics
 import time
 
-from . import db, sleeper
+from . import advanced, db, sleeper
 
 PRESET = {"ppr": "pts_ppr", "half": "pts_half", "std": "pts_std"}
 TOP = {"QB": 12, "RB": 24, "WR": 24, "TE": 12, "K": 12, "DEF": 12}
@@ -255,6 +255,100 @@ def opponents(conn, season):
     return memo(conn, ("opps", season), build)
 
 
+# ---------------------------------------------------------------------- advanced metrics (nflverse)
+def passer_rating(att, cmp, yds, td, ints):
+    """NFL passer rating, used here as 'passer rating when targeted' for receivers."""
+    if not att:
+        return None
+    clamp = lambda x: max(0.0, min(2.375, x))
+    a = clamp((cmp / att - 0.3) * 5)
+    b = clamp((yds / att - 3) * 0.25)
+    c = clamp(td / att * 20)
+    d = clamp(2.375 - ints / att * 25)
+    return round((a + b + c + d) / 6 * 100, 1)
+
+
+def _adv_metrics(s):
+    d = lambda a, b: (a / b) if b else None
+    m = {
+        # Passing (RBSDM definitions: every dropback, including sacks and scrambles)
+        "dropbacks": s["dropbacks"], "pass_epa": s["pass_epa"],
+        "epa_db": d(s["pass_epa"], s["dropbacks"]), "sr_db": d(s["pass_success"], s["dropbacks"]),
+        "cpoe": d(s["cpoe_sum"], s["cpoe_n"]), "adot_pass": d(s["pass_air_yds"], s["pass_att"]),
+        "deep_pct": d(s["deep_att"], s["pass_att"]), "sack_pct": d(s["sacks"], s["dropbacks"]),
+        "press_pct": d(s["pressured"], s["dropbacks"]), "blitz_pct": d(s["blitzed"], s["dropbacks"]),
+        "bad_pct": d(s["bad_throws"], s["pass_att"]), "scrambles": s["scrambles"], "rz_db": s["rz_dropbacks"],
+        # Rushing (designed runs: no scrambles or kneel-downs)
+        "runs": s["rush_att"], "rush_epa": s["rush_epa"],
+        "epa_rush": d(s["rush_epa"], s["rush_att"]), "sr_rush": d(s["rush_success"], s["rush_att"]),
+        "expl_pct": d(s["explosive_rush"], s["rush_att"]),
+        "ybc_att": d(s["yds_before_contact"], s["pfr_carries"]), "yco_att": d(s["yds_after_contact"], s["pfr_carries"]),
+        "rz_rush": s["rz_rush"], "i5_rush": s["i5_rush"],
+        "btk": (s["rush_broken_tackles"] or 0) + (s["rec_broken_tackles"] or 0),
+        # Receiving
+        "rec_epa": s["rec_epa"], "epa_tgt": d(s["rec_epa"], s["targets"]), "sr_tgt": d(s["rec_success"], s["targets"]),
+        "racr": d(s["rec_yds"], s["air_yds"]) if (s["air_yds"] or 0) > 0 else None,
+        "yac_rec": d(s["yac"], s["rec"]), "drops": s["drops"], "drop_pct": d(s["drops"], s["targets"]),
+        "ez_tgt": s["ez_targets"], "deep_tgt": s["deep_targets"], "rz_tgt": s["rz_targets"],
+        "first_downs": s["rec_first_downs"],
+        "rtg_tgt": passer_rating(s["targets"], s["rec"], s["rec_yds"], s["rec_td"], s["tgt_ints"]),
+    }
+    plays = (s["dropbacks"] or 0) + (s["rush_att"] or 0) + (s["targets"] or 0)
+    m["tot_epa"] = (s["pass_epa"] or 0) + (s["rush_epa"] or 0) + (s["rec_epa"] or 0)
+    m["epa_play"] = d(m["tot_epa"], plays)
+    m["adv_plays"] = plays
+    return {k: (round(v, 3) if isinstance(v, float) else v) for k, v in m.items()}
+
+
+def adv_summaries(conn, season):
+    """pid -> season advanced metrics (play-by-play + PFR + Next Gen Stats)."""
+    def build():
+        sums = ", ".join(f"SUM({c}) AS {c}" for c in advanced.PLAYER_COLS)
+        out = {r["player_id"]: _adv_metrics(dict(r)) for r in conn.execute(
+            f"SELECT player_id, {sums} FROM adv_week WHERE season=? GROUP BY player_id", (season,))}
+        for r in conn.execute("SELECT player_id, data FROM ngs_season WHERE season=?", (season,)):
+            out.setdefault(r["player_id"], {}).update(
+                {k: round(v, 3) for k, v in json.loads(r["data"]).items() if v is not None})
+        return out
+    return memo(conn, ("adv", season), build)
+
+
+def team_tiers(conn, season=None, last=None):
+    """Team offense/defense efficiency (EPA per play, success rate, pass rate over expected)."""
+    seasons = [r[0] for r in conn.execute("SELECT DISTINCT season FROM team_adv_week ORDER BY season DESC")]
+    if not seasons:
+        return {"season": season, "seasons": [], "teams": [], "weeks": []}
+    season = int(season or seasons[0])
+    weeks = [r[0] for r in conn.execute("SELECT DISTINCT week FROM team_adv_week WHERE season=? ORDER BY week", (season,))]
+    use = weeks[-int(last):] if last else weeks
+    if not use:
+        return {"season": season, "seasons": seasons, "teams": [], "weeks": []}
+    q = (f"SELECT team, side, COUNT(DISTINCT week) AS g, " + ", ".join(f"SUM({c}) AS {c}" for c in advanced.TEAM_COLS)
+         + f" FROM team_adv_week WHERE season=? AND week IN ({','.join('?' * len(use))}) GROUP BY team, side")
+    agg = {}
+    for r in conn.execute(q, (season, *use)):
+        agg.setdefault(r["team"], {})[r["side"]] = dict(r)
+    d = lambda a, b: round(a / b, 3) if b else None
+    teams = []
+    for team, sides in agg.items():
+        o, df = sides.get("off") or {}, sides.get("def") or {}
+        t = {"team": team, "games": o.get("g"),
+             "off_epa": d(o.get("epa", 0), o.get("plays")), "def_epa": d(df.get("epa", 0), df.get("plays")),
+             "off_pass_epa": d(o.get("pass_epa", 0), o.get("pass_plays")), "off_rush_epa": d(o.get("rush_epa", 0), o.get("rush_plays")),
+             "def_pass_epa": d(df.get("pass_epa", 0), df.get("pass_plays")), "def_rush_epa": d(df.get("rush_epa", 0), df.get("rush_plays")),
+             "off_sr": d(o.get("success", 0), o.get("plays")), "def_sr": d(df.get("success", 0), df.get("plays")),
+             "db_rate": d(o.get("pass_plays", 0), o.get("plays")),
+             "proe": round(o["pass_oe_sum"] / o["xpass_n"], 1) if o.get("xpass_n") else None,
+             "plays_pg": round(o.get("plays", 0) / o["g"], 1) if o.get("g") else None}
+        t["net_epa"] = round((t["off_epa"] or 0) - (t["def_epa"] or 0), 3)
+        teams.append(t)
+    for key, desc in (("off_epa", True), ("def_epa", False), ("net_epa", True)):
+        for i, t in enumerate(sorted(teams, key=lambda t: (t[key] is None, -(t[key] or 0) if desc else (t[key] or 0)))):
+            t[f"{key}_rank"] = i + 1
+    teams.sort(key=lambda t: -t["net_epa"])
+    return {"season": season, "seasons": seasons, "weeks": use, "teams": teams}
+
+
 # ---------------------------------------------------------------------- pages
 def status(conn, updater_status):
     wi = week_info(conn)
@@ -274,6 +368,7 @@ def status(conn, updater_status):
 def stats_table(conn, season, scoring, qb):
     def build():
         summ = season_summaries(conn, season, scoring)
+        adv = adv_summaries(conn, season)
         pm = player_map(conn)
         dyn, red = values_map(conn, value_fmt("dynasty", qb)), values_map(conn, value_fmt("redraft", qb))
         max_week = max([max(s["weeks"]) for s in summ.values()] or [0])
@@ -285,6 +380,9 @@ def stats_table(conn, season, scoring, qb):
                      age=p.get("age"), inj=p.get("injury_status"),
                      dyn=(dyn.get(pid) or {}).get("value"), red=(red.get(pid) or {}).get("value"),
                      wk=[sm["weeks"].get(w) for w in range(1, max_week + 1)])
+            r.update(adv.get(pid) or {})
+            if r.get("tgt_share") is not None and r.get("air_share") is not None:
+                r["wopr"] = round(1.5 * r["tgt_share"] + 0.7 * r["air_share"], 3)  # weighted opportunity rating
             rows.append(r)
         rows.sort(key=lambda r: -r["pts"])
         return {"season": season, "scoring": scoring, "max_week": max_week, "rows": rows}
@@ -356,7 +454,7 @@ def player_detail(conn, pid, scoring, qb):
         sm = season_summaries(conn, s, scoring).get(pid)
         if not sm:
             continue
-        career.append({k: v for k, v in sm.items() if k != "weeks"} | {"season": s})
+        career.append({k: v for k, v in sm.items() if k != "weeks"} | {"season": s, "adv": adv_summaries(conn, s).get(pid) or {}})
         games = sorted([d for d in season_rows(conn, s, scoring) if d["player_id"] == pid], key=lambda d: d["week"])
         logs[s] = [{
             "week": g["week"], "team": g["team"], "opp": g["opp"], "pts": g["pts"], "rank": g["wk_rank"],

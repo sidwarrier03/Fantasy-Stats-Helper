@@ -59,6 +59,8 @@ class App:
             return q.rankings(conn, fmt, qb, scoring)
         if path == "/api/sos":
             return q.sos(conn, scoring)
+        if path == "/api/teams":
+            return q.team_tiers(conn, g("season"), g("last"))
         if path == "/api/startsit":
             ids = [i for i in (g("ids", "") or "").split(",") if i]
             return q.start_sit(conn, ids, scoring, g("week"))

@@ -8,6 +8,24 @@ import urllib.request
 UA = "Huddle/1.0 (personal fantasy football database)"
 
 
+def get_bytes(url, timeout=180, retries=3):
+    """GET a file (follows redirects). Returns None on 404. Content is returned exactly as served."""
+    last = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read()
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return None
+            last = e
+        except Exception as e:
+            last = e
+        time.sleep(2 * (attempt + 1))
+    raise RuntimeError(f"GET {url} failed: {last}")
+
+
 def get_json(url, timeout=60, retries=3):
     """GET a URL and decode JSON. Returns None on 404. Retries transient errors."""
     last = None

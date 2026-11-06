@@ -6,6 +6,7 @@ const ROUTES = {
   stats: { label: "Stats Database", icon: I('<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>'), load: () => import("./views/stats.js") },
   rankings: { label: "Rankings", icon: I('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'), load: () => import("./views/rankings.js") },
   compare: { label: "Compare Players", icon: I('<path d="M16 3h5v5M8 21H3v-5M21 3l-7 7M3 21l7-7"/>'), load: () => import("./views/compare.js") },
+  teams: { label: "Team Tiers", icon: I('<circle cx="7" cy="17" r="2"/><circle cx="12" cy="9" r="2"/><circle cx="17" cy="14" r="2"/><circle cx="19" cy="5" r="2"/><path d="M3 3v18h18"/>'), load: () => import("./views/teams.js") },
   sos: { label: "Strength of Schedule", icon: I('<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>'), load: () => import("./views/sos.js") },
   trade: { label: "Trade Calculator", icon: I('<path d="M7 7h13l-4-4M17 17H4l4 4"/>'), load: () => import("./views/trade.js") },
   "start-sit": { label: "Start / Sit", icon: I('<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'), load: () => import("./views/startsit.js") },
@@ -18,7 +19,7 @@ const ROUTES = {
 };
 const GROUPS = [
   ["Overview", ["dashboard"]],
-  ["Research", ["stats", "rankings", "compare", "sos"]],
+  ["Research", ["stats", "rankings", "compare", "teams", "sos"]],
   ["Tools", ["trade", "start-sit", "waivers"]],
   ["My teams", ["leagues", "portfolio"]],
   ["Data", ["sql"]],

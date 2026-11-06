@@ -74,6 +74,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -164,7 +165,8 @@ select { padding-right: 28px; }
 .btn.sm { padding: 5px 10px; font-size: 12.5px; border-radius: 8px; }
 .btn svg { width: 15px; height: 15px; }
 .btn:disabled { opacity: 0.5; cursor: default; }
-.seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; }
+.seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.seg::-webkit-scrollbar { display: none; }
 .seg button {
   border: 0; background: transparent; padding: 5px 11px; border-radius: 7px; cursor: pointer; color: var(--text-2);
   font-size: 12.5px; font-weight: 500; white-space: nowrap;

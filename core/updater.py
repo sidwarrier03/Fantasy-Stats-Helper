@@ -1,4 +1,4 @@
-"""Keeps the local database in sync with Sleeper and FantasyCalc.
+"""Keeps the local database in sync with Sleeper, FantasyCalc and nflverse (advanced metrics).
 
 Every run is incremental: each source has its own refresh interval, and finished
 weeks are only re-downloaded until their stat corrections have settled.
@@ -9,7 +9,7 @@ import threading
 import time
 import traceback
 
-from . import db
+from . import advanced, db
 from .net import get_json
 
 SLEEPER = "https://api.sleeper.app"
@@ -94,6 +94,7 @@ class Updater:
                 ("players", lambda: self.sync_players(conn, force)),
                 ("stats", lambda: self.sync_stats(conn, seasons, state, force)),
                 ("projections", lambda: self.sync_projections(conn, season, state, force)),
+                ("advanced", lambda: advanced.sync_all(conn, seasons, season, self._note, force)),
                 ("values", lambda: self.sync_values(conn, force)),
                 ("trending", lambda: self.sync_trending(conn, force)),
             ]
