@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Huddle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Poppins:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237c62d6'/%3E%3Cellipse cx='16' cy='16' rx='10' ry='6.5' transform='rotate(-35 16 16)' fill='%23ffffff'/%3E%3C/svg%3E">
+  <script>try { const t = localStorage.getItem("huddle.theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" id="rail">
+      <a class="brand" href="#dashboard">
+        <span class="brand-mark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><ellipse cx="12" cy="12" rx="9" ry="5.6" transform="rotate(-35 12 12)"/><path d="M9.5 14.5l5-5M10.6 11.3l2.1 2.1M12.3 9.6l2.1 2.1"/></svg>
+        </span>
+        <span><div class="brand-name">Huddle</div><div class="brand-sub">Fantasy football database</div></span>
+      </a>
+      <nav class="nav" id="nav"></nav>
+      <div class="rail-foot">
+        <div class="sync-card" id="sync-card"><div class="sync-row"><span class="dot busy"></span>Connecting…</div></div>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+    <div class="main">
+      <header class="topbar">
+        <button class="btn ghost menu-btn" id="menu-btn" aria-label="Open menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="search-wrap picker" id="global-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="search" id="global-search-input" placeholder="Search players…" autocomplete="off">
+        </div>
+        <div class="settings" id="settings"></div>
+      </header>
+      <main class="content" id="view"></main>
+    </div>
+  </div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
