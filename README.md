@@ -6,17 +6,27 @@ No accounts, no API keys, no installs. You only need Python 3.9 or newer.
 
 ## Start it
 
-**Mac / Linux:** double-click `start-mac-linux.sh`, or run:
+### Windows: one click
+
+1. On GitHub, click **Code > Download ZIP**. Right-click the ZIP and choose **Extract All**. Keep the folder somewhere permanent, like Documents, because the desktop icon points to it.
+2. Double-click **Start Huddle.bat**. If Windows says "Windows protected your PC", click **More info > Run anyway**. You only have to do this once.
+   - If Python isn't installed, the launcher installs it for you. This takes a minute or two and doesn't need admin rights.
+   - Huddle opens in your browser, and a **Huddle** icon appears on your desktop.
+3. From then on, just double-click the **Huddle** icon on your desktop.
+
+Huddle runs quietly in the background, with no window, and keeps itself updated. Clicking the icon while it's already running just opens it in your browser again. To stop it, click **Quit Huddle** at the bottom of the sidebar.
+
+### Mac / Linux
+
+Double-click `start-mac-linux.sh`, or run:
 
 ```bash
 python3 huddle.py
 ```
 
-**Windows:** double-click `start-windows.bat`.
+Your browser opens at <http://localhost:8765>. Leave the terminal window open while you use Huddle. Stop it with **Quit Huddle** in the sidebar, or Ctrl+C in the terminal.
 
-Your browser opens at <http://localhost:8765>. The first start builds the database (about 30 seconds). After that it opens instantly.
-
-Leave it running and it updates itself every 2 hours. Close it with Ctrl+C.
+The first start builds the database (about 30 seconds). After that it opens instantly, and while it's running it updates itself every 2 hours.
 
 ## What updates, and when
 
@@ -65,12 +75,15 @@ python3 huddle.py --port 9000        use a different port
 python3 huddle.py --every 1          auto-update every hour
 python3 huddle.py --history 4        keep 4 past seasons of stats
 python3 huddle.py --no-browser       don't open a browser tab
+python3 huddle.py --background       run without a console window (logs to data/huddle.log)
 python3 huddle.py update --full      re-download everything once and exit
 ```
 
 ## Where things live
 
 - `data/huddle.db`: the SQLite database. Open it with any SQLite tool, or use the SQL Console. Delete it to start fresh.
+- `data/huddle.log`: what Huddle did while running in the background, useful if something goes wrong.
+- `Start Huddle.bat` and `start-mac-linux.sh`: the launchers.
 - `core/`: the Python backend (`updater.py` syncs data, `queries.py` powers each page, `server.py` serves the app).
 - `web/`: the browser app (plain HTML, CSS and JavaScript, no build step).
 

@@ -83,12 +83,29 @@ function renderSync(st) {
     <div class="eyebrow">${wk.season || ""} season · Week ${wk.week || "–"}</div>
     <div class="sync-row"><span class="dot ${u.running ? "busy" : err ? "err" : ""}"></span><span title="${L.esc(err || "")}">${L.esc(label)}</span></div>
     <div class="small muted">${L.int(st.counts?.stat_rows)} player-games · ${L.int(st.counts?.players)} players</div>
-    <button class="btn sm" id="sync-btn" ${u.running ? "disabled" : ""}>${I('<path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/>')}Update now</button>`;
+    <div class="toolbar" style="gap:6px">
+      <button class="btn sm" id="sync-btn" ${u.running ? "disabled" : ""}>${I('<path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/>')}Update now</button>
+      <button class="btn sm ghost" id="quit-btn" title="Stop Huddle running in the background">Quit Huddle</button>
+    </div>`;
   document.getElementById("sync-btn").onclick = async () => {
     await L.api("update", {}, { force: false });
     L.toast("Checking for new stats…");
     setTimeout(poll, 800);
   };
+  document.getElementById("quit-btn").onclick = async () => {
+    if (!confirm("Quit Huddle? It stops running in the background and stops auto-updating until you open it again.")) return;
+    stopped = true;
+    clearTimeout(pollTimer);
+    try { await L.api("quit", {}, {}); } catch {}
+    showStopped();
+  };
+}
+
+let stopped = false;
+function showStopped() {
+  document.getElementById("sync-card").innerHTML = `<div class="sync-row"><span class="dot err"></span>Huddle is stopped</div>`;
+  view.innerHTML = `<div class="card empty"><h2>Huddle is stopped</h2>
+    <p>To open it again, double-click the Huddle icon on your desktop (or <b>Start Huddle.bat</b> in the Huddle folder). You can close this tab.</p></div>`;
 }
 
 let pollTimer;
@@ -111,9 +128,11 @@ async function poll() {
       view.innerHTML = `<div class="empty"><h2>Building your database</h2><p>Downloading players, three seasons of weekly stats, projections and trade values. This takes under a minute the first time.</p></div>`;
     }
   } catch {
-    document.getElementById("sync-card").innerHTML = `<div class="sync-row"><span class="dot err"></span>Can't reach the Huddle server. Is it still running?</div>`;
+    if (stopped) return;
+    document.getElementById("sync-card").innerHTML = `<div class="sync-row"><span class="dot err"></span>Huddle isn't running. Open it again from the Huddle icon on your desktop or the launcher in the Huddle folder.</div>`;
+    delay = 10000;
   }
-  pollTimer = setTimeout(poll, delay);
+  if (!stopped) pollTimer = setTimeout(poll, delay);
 }
 
 L.attachPicker(document.getElementById("global-search"), {

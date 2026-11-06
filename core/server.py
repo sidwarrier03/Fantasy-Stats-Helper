@@ -19,6 +19,7 @@ class App:
         self.updater = updater
         self.scheduler = scheduler
         self.local = threading.local()
+        self.httpd = None  # set once the server is created, so the app can shut itself down
 
     def conn(self):
         c = getattr(self.local, "conn", None)
@@ -37,6 +38,10 @@ class App:
             return q.status(conn, self.updater.status)
         if path == "/api/update" and method == "POST":
             self.scheduler.trigger(force=(body or {}).get("force", False))
+            return {"ok": True}
+        if path == "/api/quit" and method == "POST":
+            if self.httpd:  # shut down after this response has been sent
+                threading.Timer(0.3, self.httpd.shutdown).start()
             return {"ok": True}
         if path == "/api/dashboard":
             return q.dashboard(conn, scoring, fmt, qb)
