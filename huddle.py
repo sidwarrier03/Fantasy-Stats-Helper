@@ -18,37 +18,51 @@ import traceback
 import urllib.request
 import webbrowser
 
-if sys.version_info < (3, 9):
-    sys.exit("Huddle needs Python 3.9 or newer.")
-
 ROOT = os.path.dirname(os.path.abspath(__file__))
-os.chdir(ROOT)
-sys.path.insert(0, ROOT)
+BACKGROUND = "--background" in sys.argv  # started by the Windows launcher: no console window
 
-from core import db  # noqa: E402
-from core.server import App, serve  # noqa: E402
-from core.updater import Scheduler, Updater  # noqa: E402
-
-
-def already_running(port):
-    """True if a Huddle server is already answering on this port."""
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    try:
-        with opener.open(f"http://127.0.0.1:{port}/api/status", timeout=1.5) as r:
-            return "week" in json.loads(r.read() or b"{}")
-    except Exception:
-        return False
+if BACKGROUND:
+    # pythonw has no console, so send all output (including errors) to data/huddle.log.
+    os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
+    sys.stdout = sys.stderr = open(os.path.join(ROOT, "data", "huddle.log"), "a", buffering=1, encoding="utf-8")
 
 
-def show_error(msg, background):
-    """Print the error, and on Windows background launches also show a message box."""
+def show_error(msg):
+    """Print the error, and when there is no console (Windows launcher) also show a message box."""
     print(msg, file=sys.stderr)
-    if background and os.name == "nt":
+    if BACKGROUND and os.name == "nt":
         try:
             import ctypes
             ctypes.windll.user32.MessageBoxW(0, msg, "Huddle", 0x10)
         except Exception:
             pass
+
+
+if sys.version_info < (3, 9):
+    show_error("Huddle needs Python 3.9 or newer. Install the latest Python from python.org, then try again.")
+    sys.exit(1)
+
+os.chdir(ROOT)
+sys.path.insert(0, ROOT)
+try:
+    from core import db
+    from core.server import App, serve
+    from core.updater import Scheduler, Updater
+except Exception:
+    show_error("Huddle couldn't start because some of its files are missing or out of date.\n\n"
+               "Download Huddle again from GitHub and copy ALL of its files into your Huddle folder, "
+               "replacing the old ones.\n\n" + traceback.format_exc(limit=2))
+    sys.exit(1)
+
+
+def already_running(port, timeout=8):
+    """True if a Huddle server is answering on this port. Allows a slow reply: Huddle can be busy importing stats."""
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(f"http://127.0.0.1:{port}/api/status", timeout=timeout) as r:
+            return "week" in json.loads(r.read() or b"{}")
+    except Exception:
+        return False
 
 
 def ensure_windows_shortcut():
@@ -100,11 +114,6 @@ def main():
     ap.add_argument("--shortcut", action="store_true", help="on Windows, add a desktop icon the first time")
     args = ap.parse_args()
 
-    if args.background:
-        os.makedirs(os.path.join(ROOT, "data"), exist_ok=True)
-        log = open(os.path.join(ROOT, "data", "huddle.log"), "a", buffering=1, encoding="utf-8")
-        sys.stdout = sys.stderr = log
-
     updater = Updater(args.db, history=args.history)
     if args.command == "update":
         updater.run(force=args.full)
@@ -125,15 +134,21 @@ def main():
 
     try:
         db.connect(args.db).close()  # create the schema before the first request
-        app = App(args.db, updater, None)
+    except Exception:
+        show_error("Huddle couldn't open its database (data\\huddle.db).\n\n" + traceback.format_exc(limit=2))
+        sys.exit(1)
+    app = App(args.db, updater, None)
+    try:
         httpd = serve(app, args.host, args.port)
     except OSError as e:
+        # The port is taken. Usually that's Huddle itself, still busy (e.g. importing new stats): wait for it.
+        if already_running(args.port, timeout=30):
+            print(f"Huddle is already running at {url}")
+            if not args.no_browser:
+                webbrowser.open(url)
+            return
         show_error(f"Huddle couldn't start: port {args.port} is being used by another program.\n\n"
-                   f"Close that program, or start Huddle with a different port, e.g. --port 8800.\n\n({e})",
-                   args.background)
-        sys.exit(1)
-    except Exception:
-        show_error("Huddle couldn't start:\n\n" + traceback.format_exc(limit=3), args.background)
+                   f"Restart your computer, or start Huddle with a different port, e.g. --port 8800.\n\n({e})")
         sys.exit(1)
 
     scheduler = Scheduler(updater, args.every)
@@ -152,4 +167,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception:
+        show_error("Huddle stopped because of an unexpected error:\n\n" + traceback.format_exc(limit=4))
+        sys.exit(1)

@@ -16,6 +16,10 @@ No accounts, no API keys, no installs. You only need Python 3.9 or newer.
 
 Huddle runs quietly in the background, with no window, and keeps itself updated. Clicking the icon while it's already running just opens it in your browser again. To stop it, click **Quit Huddle** at the bottom of the sidebar.
 
+**Updating from a ZIP download:** click **Quit Huddle** in the sidebar, download the new ZIP, and copy everything inside it into your Huddle folder, replacing the old files. Your data folder isn't touched. Windows may ask "Windows protected your PC" once more for the new launcher: click **More info > Run anyway**. The first start after an update takes a minute or two while Huddle imports any new stats.
+
+**If Huddle won't open on Windows:** double-click **Troubleshoot Huddle.bat** in the Huddle folder. It runs Huddle in a visible window, so any error message stays on screen. Huddle also writes what it's doing to `data\huddle.log`.
+
 ### Mac / Linux
 
 Double-click `start-mac-linux.sh`, or run:

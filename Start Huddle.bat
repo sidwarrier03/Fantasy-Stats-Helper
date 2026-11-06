@@ -24,10 +24,24 @@ call :find_python
 if not defined PYEXE goto :no_python
 
 :launch
+if /i "%~1"=="debug" goto :debug
 rem Use the window-less pythonw.exe so no black console window stays open.
 set "PYW=%PYEXE:python.exe=pythonw.exe%"
 if not exist "%PYW%" set "PYW=%PYEXE%"
 start "" "%PYW%" "%~dp0huddle.py" --background --shortcut
+exit /b 0
+
+:debug
+rem Troubleshooting mode: run Huddle in this window so any error stays visible.
+echo.
+echo   Starting Huddle in troubleshooting mode using:
+echo   %PYEXE%
+echo   Leave this window open while you use Huddle. Errors will appear below.
+echo.
+"%PYEXE%" "%~dp0huddle.py"
+echo.
+echo   Huddle has stopped. If you see an error above, copy it and send it along.
+pause
 exit /b 0
 
 :find_python
