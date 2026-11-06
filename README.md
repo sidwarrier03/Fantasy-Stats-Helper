@@ -46,7 +46,11 @@ To keep the database fresh even when the app is closed, schedule the headless up
 - **Compare Players**: up to four players side by side, with an overlaid weekly points chart.
 - **Strength of Schedule**: fantasy points each defense allows to every position, and a heatmap of every team's remaining schedule (next 4 weeks, fantasy playoffs, or rest of season).
 - **Trade Calculator**: values for your format, a consolidation premium so 2-for-1 deals are judged fairly, a fairness verdict, and suggestions for what to add to even it out.
-- **Start / Sit**: blends this week's projection, recent form, matchup and injury status into a ranked recommendation with reasons.
+- **Start / Sit**: two modes.
+  - **My Sleeper team** imports your roster from any connected league, scores every player with that league's exact scoring, and builds the best lineup for your league's actual slots (FLEX, Superflex, etc.). It compares that lineup with the one you have set in Sleeper and tells you exactly which swaps to make. Players whose game has already kicked off are locked in place, and you can switch to any other team in the league to scout an opponent.
+  - **Compare players** ranks any players you pick head to head.
+
+  Both blend this week's projection, recent form, matchup and injury status into a "Huddle score", with the reasons shown for every player.
 - **Waiver Wire**: trending adds and drops; pick one of your leagues to see the best players actually available there, ranked by rest-of-season points over the last starter at each position.
 - **My Leagues** (Sleeper): enter your username to get, for each league, power rankings with a contend/rebuild window, rosters with values and draft picks (trades included), weekly matchups with win odds, and a trade finder that builds offers from your roster that fit the other team's needs.
 - **Portfolio**: your exposure to every player across all your leagues.

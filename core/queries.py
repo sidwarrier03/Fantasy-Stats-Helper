@@ -474,6 +474,120 @@ def start_sit(conn, ids, scoring, week=None):
     return {"week": week, "season": wi["season"], "players": out}
 
 
+def team_lineup(conn, league_id, owner=None, username=None, roster_id=None, week=None):
+    """Start/sit for a whole Sleeper roster: best lineup for the league's slots vs the lineup set in Sleeper.
+
+    Uses the league's own scoring. Players whose game has started are locked where they are.
+    """
+    lg = sleeper.league(conn, league_id)
+    if not lg:
+        return None
+    if not owner and username:
+        u = sleeper.user(conn, username)
+        owner = u and u["user_id"]
+    rosters = sleeper.rosters(conn, league_id)
+    if not rosters:
+        return None
+    users = {u["user_id"]: u for u in sleeper.users(conn, league_id)}
+
+    def is_mine(r):
+        return bool(owner) and (r.get("owner_id") == owner or owner in (r.get("co_owners") or []))
+
+    def label(r):
+        u = users.get(r.get("owner_id")) or {}
+        return {"roster_id": r["roster_id"], "owner": u.get("display_name") or f"Team {r['roster_id']}",
+                "name": (u.get("metadata") or {}).get("team_name") or u.get("display_name") or f"Team {r['roster_id']}",
+                "mine": is_mine(r)}
+
+    mine = next((r for r in rosters if is_mine(r)), None)
+    r = next((x for x in rosters if roster_id and str(x["roster_id"]) == str(roster_id)), None) or mine or rosters[0]
+
+    scoring = f"league:{league_id}"
+    wi = week_info(conn)
+    week = int(week or wi["upcoming"] or wi["week"] or 1)
+    slots = [s for s in (lg.get("roster_positions") or []) if s not in ("BN", "TAXI", "IR")]
+    unavailable = set(r.get("taxi") or []) | set(r.get("reserve") or [])
+    players = start_sit(conn, [p for p in (r.get("players") or []) if p not in unavailable], scoring, week)["players"]
+    by_id = {p["id"]: p for p in players}
+
+    # Lineup currently set in Sleeper (index-aligned with the starting slots).
+    current_ids = None
+    if lg.get("season") == str(wi["season"]):
+        for m in sleeper.matchups(conn, league_id, week):
+            if m.get("roster_id") == r["roster_id"]:
+                current_ids = m.get("starters")
+    current_ids = current_ids or r.get("starters") or []
+    current = [(pid if pid and pid != "0" else None) for pid in list(current_ids)[:len(slots)]]
+    current += [None] * (len(slots) - len(current))
+
+    # A player is locked once his game has started: keep him where he is in Sleeper.
+    status = {}
+    for g in conn.execute("SELECT home, away, status FROM schedule WHERE season=? AND week=?", (wi["season"], week)):
+        status[g["home"]] = status[g["away"]] = g["status"]
+    for p in players:
+        p["locked"] = p["actual"] is not None or status.get(p["team"]) in ("complete", "in_game")
+    locked_start = {i: pid for i, pid in enumerate(current) if pid in by_id and by_id[pid]["locked"]}
+    open_idx = [i for i, s in enumerate(slots) if s in SLOT_ELIGIBLE and i not in locked_start]
+    pool = [p for p in players if not p["locked"]]
+    picks = best_lineup(pool, [slots[i] for i in open_idx], "score")
+
+    # Place the chosen players into concrete slots. Prefer leaving each one in the slot he already
+    # occupies in Sleeper (so two starters swapping RB/FLEX doesn't show up as a change); if that
+    # leaves someone unplaceable, fall back to the plain strictest-slot-first placement.
+    chosen = [p["id"] for _, p in picks]
+
+    def place(keep_current):
+        out, left = dict(locked_start), list(chosen)
+        if keep_current:
+            for i in open_idx:
+                cid = current[i]
+                if cid in left and by_id[cid]["pos"] in SLOT_ELIGIBLE[slots[i]]:
+                    out[i] = cid
+                    left.remove(cid)
+        for i in sorted([i for i in open_idx if i not in out], key=lambda i: SLOT_ORDER.index(slots[i])):
+            cands = sorted([pid for pid in left if by_id[pid]["pos"] in SLOT_ELIGIBLE[slots[i]]],
+                           key=lambda pid: -by_id[pid]["score"])
+            if cands:
+                out[i] = cands[0]
+                left.remove(cands[0])
+        return out, left
+
+    rec, unplaced = place(True)
+    if unplaced:
+        rec, _ = place(False)
+
+    rows = []
+    for i, s in enumerate(slots):
+        rid, cid = rec.get(i), current[i]
+        if s not in SLOT_ELIGIBLE:
+            continue
+        state = ("locked" if i in locked_start else "empty" if not rid else "keep" if rid == cid else
+                 "move" if rid in current else "start")
+        rows.append({"slot": s, "rec": rid, "cur": cid, "state": state})
+    rec_ids = {x["rec"] for x in rows if x["rec"]}
+    cur_ids = {x["cur"] for x in rows if x["cur"]}
+    for p in players:
+        p["in_lineup"] = p["id"] in rec_ids
+        p["starting"] = p["id"] in cur_ids
+
+    def total(ids, key):
+        return round(sum((by_id[i].get(key) or 0) for i in ids if i in by_id), 1)
+
+    lg_ss = lg.get("scoring_settings") or {}
+    return {
+        "league": {"id": league_id, "name": lg.get("name"), "season": lg.get("season"),
+                   "ppr": lg_ss.get("rec", 0), "te_prem": lg_ss.get("bonus_rec_te", 0),
+                   "pass_td": lg_ss.get("pass_td", 4)},
+        "week": week, "team": label(r), "teams": [label(x) for x in rosters], "found_me": mine is not None,
+        "rows": rows, "players": players,
+        "changes": {"start": [i for i in rec_ids - cur_ids], "bench": [i for i in cur_ids - rec_ids if i in by_id],
+                    "empty": sum(1 for x in rows if not x["cur"])},
+        "totals": {"rec_proj": total(rec_ids, "proj"), "cur_proj": total(cur_ids, "proj"),
+                   "rec_score": total(rec_ids, "score"), "cur_score": total(cur_ids, "score")},
+        "unsupported": sorted({s for s in slots if s not in SLOT_ELIGIBLE}),
+    }
+
+
 def _ordinal(n):
     return f"{n}{'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 

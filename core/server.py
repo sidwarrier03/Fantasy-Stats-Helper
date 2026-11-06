@@ -57,6 +57,11 @@ class App:
         if path == "/api/startsit":
             ids = [i for i in (g("ids", "") or "").split(",") if i]
             return q.start_sit(conn, ids, scoring, g("week"))
+        if path == "/api/startsit/team":
+            res = q.team_lineup(conn, g("league", ""), g("owner"), g("username"), g("roster"), g("week"))
+            if res is None:
+                raise LookupError("Couldn't load that league from Sleeper")
+            return res
         if path == "/api/waivers":
             return q.waivers(conn, scoring, fmt, qb, g("league"))
         if path == "/api/sleeper/leagues":
